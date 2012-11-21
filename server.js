@@ -1,8 +1,10 @@
-#!/bin/env node
+#!/usr/bin/env node
 //  OpenShift sample Node application
 var express = require('express');
 var fs      = require('fs');
-
+var routes  = require('./routes');
+var user    = require('./routes/user');
+var path    = require('path');
 
 /**
  *  Define the sample application.
@@ -33,25 +35,6 @@ var SampleApp = function() {
         };
     };
 
-
-    /**
-     *  Populate the cache.
-     */
-    self.populateCache = function() {
-        if (typeof self.zcache === "undefined") {
-            self.zcache = { 'index.html': '' };
-        }
-
-        //  Local cache for static content.
-        self.zcache['index.html'] = fs.readFileSync('./index.html');
-    };
-
-
-    /**
-     *  Retrieve entry (content) from cache.
-     *  @param {string} key  Key identifying content to retrieve from cache.
-     */
-    self.cache_get = function(key) { return self.zcache[key]; };
 
 
     /**
@@ -89,42 +72,31 @@ var SampleApp = function() {
     /*  App server functions (main app logic here).                       */
     /*  ================================================================  */
 
-    /**
-     *  Create the routing table entries + handlers for the application.
-     */
-    self.createRoutes = function() {
-        self.routes = { };
-
-        // Routes for /health, /asciimo and /
-        self.routes['/health'] = function(req, res) {
-            res.send('1');
-        };
-
-        self.routes['/asciimo'] = function(req, res) {
-            var link = "http://i.imgur.com/kmbjB.png";
-            res.send("<html><body><img src='" + link + "'></body></html>");
-        };
-
-        self.routes['/'] = function(req, res) {
-            res.setHeader('Content-Type', 'text/html');
-            res.send(self.cache_get('index.html') );
-        };
-    };
-
 
     /**
      *  Initialize the server (express) and create the routes and register
      *  the handlers.
      */
     self.initializeServer = function() {
-        self.createRoutes();
-        self.app = express.createServer();
+        self.app = express();
 
+        self.app.configure(function() {
+            self.app.set('views', __dirname + '/views');
+            self.app.set('view engine', 'ejs');
+            self.app.use(express.favicon());
+            self.app.use(express.logger('dev'));
+            self.app.use(express.bodyParser());
+            self.app.use(express.methodOverride());
+            self.app.use(express.cookieParser('Op0mfIhs01Uk1t14G4paudaSPrbDswMXjKcwOZDs44ey5pTvESFOerCh4urTVZJ0'));
+            self.app.use(express.session());
+            self.app.use(self.app.router);
+            self.app.use(require('stylus').middleware(__dirname + '/public'));
+            self.app.use(express.static(path.join(__dirname, 'public')));
+        });
         //  Add handlers for the app (from the routes).
-        for (var r in self.routes) {
-            self.app.get(r, self.routes[r]);
-        }
-    };
+        self.app.get('/', routes.index);
+        self.app.get('/users', user.list);
+    }
 
 
     /**
@@ -132,7 +104,6 @@ var SampleApp = function() {
      */
     self.initialize = function() {
         self.setupVariables();
-        self.populateCache();
         self.setupTerminationHandlers();
 
         // Create the express server and routes.
@@ -161,4 +132,3 @@ var SampleApp = function() {
 var zapp = new SampleApp();
 zapp.initialize();
 zapp.start();
-
